@@ -1,0 +1,39 @@
+<?php
+
+/**
+ * @file
+ * Requirements for IIRS
+ */
+
+/**
+* Implements hook_requirements()
+*
+* Requirement for PHP 5.0+
+*   DOMDocument
+*   various other PHP commands
+*/
+function IIRS_requirements($phase) {
+  $requirements = array();
+
+  if ($phase == 'install') {
+    if (version_compare(phpversion(), '5', '<')) {
+      $requirements['IIRS_PHP'] = array(
+        'title'       => 'IIRS Module: PHP check',
+        'description' => 'IIRS Module: PHP >= 5.0 required for DOMDocument class and some other PHP commands',
+        'severity'    => REQUIREMENT_ERROR
+      );
+    }
+
+    if (!class_exists('DOMDocument')) {
+      $requirements['IIRS_DOMDocument'] = array(
+        'title'       => 'IIRS Module: DOMDocument check',
+        'description' => 'IIRS Module: DOMDocument required for mapping search results analysis',
+        'severity'    => REQUIREMENT_ERROR
+      );
+    }
+
+    //TODO: checks for jQuery
+  }
+
+  return $requirements;
+}

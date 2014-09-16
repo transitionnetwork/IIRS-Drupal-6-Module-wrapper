@@ -1,0 +1,118 @@
+<?php
+/**
+* IIRS module
+*
+* Allow users to register their TIs on the system
+* Transition Network
+* Also serves the same code for remote Javascript popup use of the registration system
+*
+* LICENSE: program is distributed under the terms of the GNU General
+* Public License
+*
+* @category  Transition Network
+* @package   IIRS
+* @author    Annesley <annesley_newholm@yahoo.it>
+* @copyright 2009 Transition network
+* @license   http://www.gnu.org/licenses/gpl.txt GNU General Public License
+* @link      http://transitionnetwork.org
+*
+*/
+
+define('IIRS_0_CONTENT_TYPE', 'initiative_profile');
+define('IIRS_0_MAX_NEARBY', 10);
+
+require_once('IIRS_abstraction_layer.inc');
+set_include_path(get_include_path() . PATH_SEPARATOR . __DIR__ . '/IIRS_common');
+
+function IIRS_menu() {
+  //general page loader for /IIRS/%/%
+  $items['IIRS/%'] = array(
+    'page callback' => '_IIRS_show_page',
+    'page arguments' => array(1, 2),
+    'access callback' => TRUE,
+  );
+  return $items;
+}
+
+function _IIRS_input($sKey) {
+  return (isset($_POST[$sKey]) ? $_POST[$sKey] : (isset($_GET[$sKey]) ? $_GET[$sKey] : NULL));
+}
+
+function _IIRS_show_page($widget_folder, $page_stem) {
+  //various path identifiers and defaults
+  global $is_home_domain;
+  $returned = NULL;
+
+  if (!$is_home_domain) {
+    //and again
+    error_reporting(E_ALL | ~E_STRICT);
+    ini_set('display_errors', TRUE);
+    ini_set('display_startup_errors', TRUE);
+  }
+
+  //some servers will restrict direct access to PHP files
+  if (!$page_stem) $page_stem = "index.php";
+  $page_extension = (!pathinfo($page_stem, PATHINFO_EXTENSION) ? '.php' : ''); //pathinfo() PHP 4 >= 4.0.3, PHP 5
+  $page_path      = "$widget_folder/$page_stem$page_extension";
+
+  //---------------------------------------------------- direct request for the widgetloader.js
+  if (strstr($page_stem, 'widgetloader')) {
+    //widgetloader javascript will examine the $widget_folder and request the appropriate file
+    require_once('IIRS_common/widgetloader.php');
+    exit(0);
+  }
+
+  //---------------------------------------------------- image request
+  elseif ($widget_folder == 'images') {
+    $file_extension = pathinfo($page_stem, PATHINFO_EXTENSION);
+    if (!$file_extension) { //pathinfo() PHP 4 >= 4.0.3, PHP 5
+      if (    file_exists(__DIR__ . "/IIRS_common/images/$page_stem.png")) $file_extension = 'png';
+      elseif (file_exists(__DIR__ . "/IIRS_common/images/$page_stem.gif")) $file_extension = 'gif';
+      //TODO: image extension not found?
+      $page_stem .= ".$file_extension";
+    }
+    $mime       = file_get_mimetype($imageName); //since Drupal 6
+    $image_path = __DIR__ . "/IIRS_common/images/$page_stem";
+
+    header("Content-type: $mime", true);
+    print(file_get_contents($image_path));
+    exit(0);
+  }
+
+  //---------------------------------------------------- foriegn Widget content request
+  //this is a bare page content request, so show only the direct content
+  elseif (_IIRS_input('IIRS_widget_mode') == 'true') {
+    //javascript: interaction.js translations_js.php and general_interaction.js are dynamically written in to widgetloader.php
+    //javascript: these responses will be dynamically added in to the HTML on the client so no need to send the JS again
+    require_once($page_path);
+    exit(0);
+  }
+
+  else { //---------------------------------------------------- Drupal page request
+    //this is a normal Drupal page request, so return the page as markup
+    //javascript: do not add popup.php because it will override the form submits and show the popups
+    //javascript: need to add all JS to every page here because each one is new
+    //jQuery: included by default since Drupal 6.0 jQuery v1.2.3
+    $modulePath = drupal_get_path('module', 'IIRS');
+    $customJavaScriptInteractionsPath = "$modulePath/IIRS_common/$widget_folder/general_interaction.js";
+    if (file_exists($customJavaScriptInteractionsPath)) drupal_add_js($customJavaScriptInteractionsPath);
+    drupal_add_js("$modulePath/IIRS_common/general_interaction.js");
+    drupal_add_css("$modulePath/IIRS_common/general.css");
+
+    //curcumventing the template system here because we want to maintain similar markup
+    //ob_start() PHP 4, PHP 5
+    $hide_errors = true;
+    ob_start();
+    if ($hide_errors) print('<script type="text/javascript">');
+    require_once('translations_js.php');
+    require_once('global_js.php');
+    if ($hide_errors) print('</script>');
+    //primary template
+    require_once($page_path);
+    $returned = ob_get_contents();
+    ob_end_clean();
+  }
+
+  return $returned;
+}
+?>
